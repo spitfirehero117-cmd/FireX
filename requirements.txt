@@ -1,0 +1,7 @@
+Flask>=3.1,<4
+Flask-WTF>=1.2,<2
+Flask-Limiter>=4,<5
+Waitress>=3.0,<4
+Pillow>=10,<13
+
+reportlab>=4.2,<5

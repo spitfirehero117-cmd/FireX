@@ -4,4 +4,4 @@ Flask-Limiter>=4,<5
 Waitress>=3.0,<4
 Pillow>=10,<13
 
-reportlab>=4.2,<5
+reportlab>=4.2,<6

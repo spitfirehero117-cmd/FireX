@@ -1,0 +1,14 @@
+{
+  "affected_projects": [],
+  "audit_job_id": null,
+  "category": "operations",
+  "created_at": "2026-08-14T20:32:04.615721+00:00",
+  "file": "requirements.txt",
+  "line": 0,
+  "mode": "finding",
+  "project_path": null,
+  "ref": "HYRAX-17",
+  "severity": "high",
+  "title": "No lockfile \u2014 non-reproducible builds and silent dependency drift",
+  "tool": "deps"
+}

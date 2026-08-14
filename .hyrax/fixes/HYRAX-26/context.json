@@ -1,0 +1,14 @@
+{
+  "affected_projects": [],
+  "audit_job_id": null,
+  "category": "security",
+  "created_at": "2026-08-14T21:05:49.321124+00:00",
+  "file": "recovery.py",
+  "line": 13,
+  "mode": "finding",
+  "project_path": null,
+  "ref": "HYRAX-26",
+  "severity": "medium",
+  "title": "Recovery enrollment codes hashed with unsalted SHA-256 in `recovery.py`",
+  "tool": "security"
+}

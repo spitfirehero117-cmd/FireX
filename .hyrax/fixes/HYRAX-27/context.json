@@ -1,0 +1,14 @@
+{
+  "affected_projects": [],
+  "audit_job_id": null,
+  "category": "correctness",
+  "created_at": "2026-08-14T21:13:09.867161+00:00",
+  "file": "backup_db.py",
+  "line": 34,
+  "mode": "finding",
+  "project_path": null,
+  "ref": "HYRAX-27",
+  "severity": "medium",
+  "title": "prune_backups retention logic has no test coverage for the 'keep at least 7' guard",
+  "tool": "tests"
+}

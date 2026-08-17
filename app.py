@@ -61,8 +61,74 @@ DEFAULT_CERTIFICATION_OPTIONS = (
 for folder in (UPLOAD_DIR, LOG_DIR, BACKUP_DIR, MEMBER_DOC_DIR, DEPLOYMENT_FORM_DIR):
     folder.mkdir(parents=True, exist_ok=True)
 
+# Historical placeholder values that must never actually be used as live
+# secrets/credentials. If an operator has explicitly set the env var to one
+# of these (e.g. copy-pasted from documentation/.env.example) we fail
+# startup instead of silently booting with a well-known value.
+_PLACEHOLDER_SECRET_KEY = "CHANGE-ME-BEFORE-DEPLOYING"
+_PLACEHOLDER_ADMIN_PASSWORD = "change-me"
+
+SECRET_KEY_FILE = APP_DIR / ".secret_key"
+
+
+def _load_or_create_secret_key():
+    """Return a strong secret key for Flask session/CSRF signing.
+
+    Preference order:
+      1. An explicit ``SECRET_KEY`` env var (rejected if it is the known
+         placeholder literal -- that indicates a copy-pasted default, not an
+         intentional secret).
+      2. A key persisted from a previous run, so restarts do not invalidate
+         every existing session/CSRF token/device cookie.
+      3. A freshly generated, cryptographically random key, persisted with
+         restrictive file permissions for future runs.
+    """
+    env_value = os.environ.get("SECRET_KEY")
+    if env_value:
+        if env_value == _PLACEHOLDER_SECRET_KEY:
+            raise SystemExit(
+                "SECRET_KEY is set to the documented placeholder value "
+                f"({_PLACEHOLDER_SECRET_KEY!r}). Set SECRET_KEY to a real, "
+                "random secret before deploying."
+            )
+        return env_value
+
+    if SECRET_KEY_FILE.exists():
+        existing = SECRET_KEY_FILE.read_text(encoding="utf-8").strip()
+        if existing:
+            return existing
+
+    generated = secrets.token_hex(32)
+    try:
+        fd = os.open(SECRET_KEY_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(generated)
+        os.chmod(SECRET_KEY_FILE, 0o600)
+    except OSError:
+        logging.getLogger(__name__).warning(
+            "Could not persist generated SECRET_KEY to %s; a new key will "
+            "be generated on every restart, invalidating existing sessions.",
+            SECRET_KEY_FILE,
+        )
+    return generated
+
+
+def _resolve_admin_bootstrap_password():
+    """Return the password to use when bootstrapping the first admin user.
+
+    If ``ADMIN_PASSWORD`` is unset or set to the documented placeholder, a
+    strong random password is generated instead of falling back to a
+    well-known literal. The generated value is surfaced to the operator
+    once, at bootstrap time, via stdout.
+    """
+    env_value = os.environ.get("ADMIN_PASSWORD")
+    if env_value and env_value != _PLACEHOLDER_ADMIN_PASSWORD:
+        return env_value, False
+    return secrets.token_urlsafe(18), True
+
+
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "CHANGE-ME-BEFORE-DEPLOYING")
+app.secret_key = _load_or_create_secret_key()
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("COOKIE_SECURE", "0") == "1"
@@ -70,7 +136,6 @@ app.config["PERMANENT_SESSION_LIFETIME"] = 8 * 60 * 60
 app.config["WTF_CSRF_TIME_LIMIT"] = 60 * 60
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "change-me")
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "0") == "1"
 
 if os.environ.get("TRUST_PROXY", "0") == "1":
@@ -516,6 +581,7 @@ def init_db():
     admin_count = conn.execute("SELECT COUNT(*) AS c FROM admin_users").fetchone()["c"]
     if admin_count == 0:
         bootstrap_username = os.environ.get("ADMIN_USERNAME", "admin").strip() or "admin"
+        bootstrap_password, generated = _resolve_admin_bootstrap_password()
         conn.execute("""
             INSERT INTO admin_users(
                 username,display_name,password_hash,role,enabled,created_at,must_change_password
@@ -523,7 +589,7 @@ def init_db():
         """, (
             bootstrap_username,
             "System Administrator",
-            generate_password_hash(ADMIN_PASSWORD),
+            generate_password_hash(bootstrap_password),
             "admin",
             int(time.time())
         ))
@@ -532,8 +598,13 @@ def init_db():
         print("=" * 64)
         print("V6.2 ADMIN ACCOUNT CREATED")
         print("Username:", bootstrap_username)
-        print("Password: your existing ADMIN_PASSWORD")
+        if generated:
+            print("Password:", bootstrap_password)
+            print("(generated -- ADMIN_PASSWORD was not set to a real value)")
+        else:
+            print("Password: your existing ADMIN_PASSWORD")
         print("Role: Admin")
+        print("This password must be changed at first login.")
         print("=" * 64)
         print("")
 

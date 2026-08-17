@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+crew.db
+crew.db-wal
+crew.db-shm
+.secret_key
+logs/
+backups/

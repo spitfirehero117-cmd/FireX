@@ -1,5 +1,30 @@
 # NTAG215 Crew System V7.5
 
+## Dependencies
+
+Dependency versions are managed with two files:
+
+- `requirements.txt` — the human-edited source of truth. Version *ranges*
+  live here (e.g. `Flask>=3.1,<4`). Edit this file when bumping a
+  dependency.
+- `requirements.lock.txt` — the generated, fully pinned lockfile with
+  `--hash=sha256:...` entries for every package and its transitive
+  dependencies. `START_SERVER.bat` and the upgrade steps below install
+  from this file so every machine resolves to the exact same versions,
+  not "whatever is newest on PyPI today."
+
+To regenerate the lockfile after editing `requirements.txt` (requires
+`pip-tools` or `uv`):
+
+```
+uv pip compile requirements.txt -o requirements.lock.txt --generate-hashes --python-platform windows
+```
+
+(or, with `pip-tools`: `pip-compile --generate-hashes -o requirements.lock.txt requirements.txt`)
+
+Commit the regenerated `requirements.lock.txt` alongside the
+`requirements.txt` change.
+
 ## V7.5 fixes
 - Engine Boss accounts now land directly on Wildland after login and after a forced password change.
 - Visiting `/admin` as an Engine Boss redirects to Wildland instead of showing Access Denied.
@@ -63,7 +88,7 @@ On smaller screens the navigation becomes a horizontal, scrollable top bar. It d
 6. Open Terminal in V6.
 7. Run:
 
-   `python -m pip install -r requirements.txt`
+   `python -m pip install --require-hashes -r requirements.lock.txt`
 
 8. Before starting the server, run:
 

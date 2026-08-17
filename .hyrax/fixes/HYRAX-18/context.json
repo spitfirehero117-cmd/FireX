@@ -1,0 +1,14 @@
+{
+  "affected_projects": [],
+  "audit_job_id": null,
+  "category": "operations",
+  "created_at": "2026-08-14T20:44:45.909290+00:00",
+  "file": "requirements.txt",
+  "line": 7,
+  "mode": "finding",
+  "project_path": null,
+  "ref": "HYRAX-18",
+  "severity": "medium",
+  "title": "`reportlab` upper-bound pins out the current stable major (5.x excluded)",
+  "tool": "deps"
+}

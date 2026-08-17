@@ -1,0 +1,14 @@
+{
+  "affected_projects": [],
+  "audit_job_id": null,
+  "category": "operations",
+  "created_at": "2026-08-17T19:33:25.175672+00:00",
+  "file": "requirements.txt",
+  "line": 1,
+  "mode": "finding",
+  "project_path": null,
+  "ref": "HYRAX-45",
+  "severity": "high",
+  "title": "requirements.txt uses unpinned version ranges with no lockfile \u2014 non-reproducible installs",
+  "tool": "deps"
+}

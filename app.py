@@ -69,6 +69,7 @@ _PLACEHOLDER_SECRET_KEY = "CHANGE-ME-BEFORE-DEPLOYING"
 _PLACEHOLDER_ADMIN_PASSWORD = "change-me"
 
 SECRET_KEY_FILE = APP_DIR / ".secret_key"
+ADMIN_BOOTSTRAP_CREDENTIALS_FILE = APP_DIR / ".admin_bootstrap_credentials"
 
 
 def _load_or_create_secret_key():
@@ -119,12 +120,55 @@ def _resolve_admin_bootstrap_password():
     If ``ADMIN_PASSWORD`` is unset or set to the documented placeholder, a
     strong random password is generated instead of falling back to a
     well-known literal. The generated value is surfaced to the operator
-    once, at bootstrap time, via stdout.
+    once, at bootstrap time, via a local restrictive-permission file (see
+    ``_write_bootstrap_credentials_file``) -- never via stdout or the
+    application log, both of which are durable/persistent sinks here.
     """
     env_value = os.environ.get("ADMIN_PASSWORD")
     if env_value and env_value != _PLACEHOLDER_ADMIN_PASSWORD:
         return env_value, False
     return secrets.token_urlsafe(18), True
+
+
+def _write_bootstrap_credentials_file(username, password):
+    """Persist a one-time-generated admin bootstrap credential to disk.
+
+    This intentionally never goes through ``print`` or ``app.logger`` --
+    both stdout and the application log are captured by durable, persistent
+    sinks in production deployments (process supervisor / container log
+    drivers, and the rotating file handler configured on ``app.logger``),
+    so writing a plaintext credential to either one leaves it sitting in
+    long-lived logs. Instead it is written once to a local file with
+    restrictive permissions, following the same pattern already used for
+    the generated ``SECRET_KEY`` (see ``_load_or_create_secret_key``).
+    The operator is expected to read this file once and delete it.
+    """
+    try:
+        fd = os.open(
+            ADMIN_BOOTSTRAP_CREDENTIALS_FILE,
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+            0o600,
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(
+                "One-time generated admin bootstrap credentials.\n"
+                "Read this file, log in, change the password, then delete this file.\n\n"
+                f"Username: {username}\n"
+                f"Password: {password}\n"
+            )
+        os.chmod(ADMIN_BOOTSTRAP_CREDENTIALS_FILE, 0o600)
+    except OSError:
+        logging.getLogger(__name__).error(
+            "Could not write admin bootstrap credentials file to %s. "
+            "Set ADMIN_PASSWORD explicitly and re-run bootstrap instead.",
+            ADMIN_BOOTSTRAP_CREDENTIALS_FILE,
+        )
+        raise SystemExit(
+            f"Failed to persist generated admin bootstrap credentials to "
+            f"{ADMIN_BOOTSTRAP_CREDENTIALS_FILE}. Refusing to print the "
+            "password in clear text to stdout/logs; set ADMIN_PASSWORD to a "
+            "real value via environment variable and restart."
+        )
 
 
 app = Flask(__name__)
@@ -599,8 +643,17 @@ def init_db():
         print("V6.2 ADMIN ACCOUNT CREATED")
         print("Username:", bootstrap_username)
         if generated:
-            print("Password:", bootstrap_password)
+            # Never print/log the generated credential in clear text -- both
+            # stdout and app.logger are captured by durable, persistent sinks
+            # in this deployment (process supervisor / container log drivers,
+            # and the RotatingFileHandler configured on app.logger above).
+            # Instead, write it once to a local, restrictively-permissioned
+            # file the operator must read and then delete, mirroring how
+            # SECRET_KEY_FILE is handled.
+            _write_bootstrap_credentials_file(bootstrap_username, bootstrap_password)
+            print(f"Password: see {ADMIN_BOOTSTRAP_CREDENTIALS_FILE}")
             print("(generated -- ADMIN_PASSWORD was not set to a real value)")
+            print("Read that file now, then delete it -- it will not be shown again.")
         else:
             print("Password: your existing ADMIN_PASSWORD")
         print("Role: Admin")

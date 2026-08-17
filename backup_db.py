@@ -20,11 +20,15 @@ def create_backup(label="auto"):
     dest = BACKUPS / f"crew_{stamp}_{label}.db"
 
     src = sqlite3.connect(DB, timeout=15)
-    dst = sqlite3.connect(dest)
-    with dst:
-        src.backup(dst)
-    dst.close()
-    src.close()
+    try:
+        dst = sqlite3.connect(dest)
+        try:
+            with dst:
+                src.backup(dst)
+        finally:
+            dst.close()
+    finally:
+        src.close()
 
     prune_backups()
     return dest

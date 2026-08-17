@@ -2,7 +2,7 @@
   "affected_projects": [],
   "audit_job_id": null,
   "category": "security",
-  "created_at": "2026-08-17T21:21:34.459577+00:00",
+  "created_at": "2026-08-17T21:38:58.580830+00:00",
   "file": "app.py",
   "line": 65,
   "mode": "finding",

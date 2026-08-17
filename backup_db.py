@@ -1,4 +1,3 @@
-
 import os
 import sqlite3
 import time
@@ -34,9 +33,7 @@ def create_backup(label="auto"):
 def prune_backups():
     now = time.time()
     files = sorted(
-        BACKUPS.glob("crew_*.db"),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True
+        BACKUPS.glob("crew_*.db"), key=lambda p: p.stat().st_mtime, reverse=True
     )
 
     for old in files[MAX_BACKUPS:]:
@@ -44,9 +41,7 @@ def prune_backups():
 
     cutoff = now - RETENTION_DAYS * 86400
     files = sorted(
-        BACKUPS.glob("crew_*.db"),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True
+        BACKUPS.glob("crew_*.db"), key=lambda p: p.stat().st_mtime, reverse=True
     )
 
     # Always preserve at least the newest 7 backups.
@@ -56,5 +51,9 @@ def prune_backups():
 
 
 if __name__ == "__main__":
-    dest = create_backup("manual")
-    print(f"Backup created: {dest}")
+    try:
+        dest = create_backup("manual")
+        print(f"Backup created: {dest}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"Backup FAILED: {exc}")
+        raise SystemExit(1)

@@ -1,0 +1,14 @@
+{
+  "affected_projects": [],
+  "audit_job_id": null,
+  "category": "correctness",
+  "created_at": "2026-08-14T21:00:36.993746+00:00",
+  "file": "backup_db.py",
+  "line": 59,
+  "mode": "finding",
+  "project_path": null,
+  "ref": "HYRAX-25",
+  "severity": "medium",
+  "title": "Manual backup path in backup_db.py calls create_backup without error handling",
+  "tool": "resilience"
+}

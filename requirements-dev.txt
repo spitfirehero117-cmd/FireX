@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Test-only dependencies (not part of the deployed application).
+pytest>=8,<9

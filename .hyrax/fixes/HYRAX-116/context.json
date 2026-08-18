@@ -1,0 +1,14 @@
+{
+  "affected_projects": [],
+  "audit_job_id": null,
+  "category": "security",
+  "created_at": "2026-08-18T15:37:32.911441+00:00",
+  "file": "app.py",
+  "line": 1569,
+  "mode": "finding",
+  "project_path": null,
+  "ref": "HYRAX-116",
+  "severity": "medium",
+  "title": "Admin can permanently erase the entire audit log with no tamper-evidence or backup",
+  "tool": "compliance"
+}

@@ -167,10 +167,16 @@ app.jinja_env.globals["APP_VERSION"] = VERSION
 
 
 def client_ip():
-    return request.headers.get(
-        "X-Forwarded-For",
-        request.remote_addr or "unknown"
-    ).split(",")[0].strip()
+    # Only trust the X-Forwarded-For header when TRUST_PROXY=1, which is the
+    # same flag that gates ProxyFix above. Without a trusted proxy in front
+    # of the app, this header is fully attacker-controlled and can be used
+    # to reset per-IP PIN lockout counters / rate limits on every request.
+    if os.environ.get("TRUST_PROXY", "0") == "1":
+        return request.headers.get(
+            "X-Forwarded-For",
+            request.remote_addr or "unknown"
+        ).split(",")[0].strip()
+    return request.remote_addr or "unknown"
 
 
 def audit(event_type, detail="", actor=None):

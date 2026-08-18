@@ -1,0 +1,14 @@
+{
+  "affected_projects": [],
+  "audit_job_id": null,
+  "category": "security",
+  "created_at": "2026-08-17T21:31:08.163366+00:00",
+  "file": "app.py",
+  "line": 169,
+  "mode": "finding",
+  "project_path": null,
+  "ref": "HYRAX-140",
+  "severity": "high",
+  "title": "PIN brute-force lockout and rate limiting keyed on spoofable X-Forwarded-For header when not behind a trusted proxy",
+  "tool": "security"
+}

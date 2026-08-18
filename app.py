@@ -923,6 +923,21 @@ def fv(form, key):
     return form.get(key, "").strip()
 
 
+def friendly_integrity_error(exc):
+    """Translate a raw sqlite3.IntegrityError into admin-facing guidance.
+
+    SQLite's IntegrityError text (e.g. "UNIQUE constraint failed:
+    profiles.slug") leaks table/column names and gives a non-technical
+    admin no clue which form field to fix. Map the known unique
+    constraints on the member/profile form to specific, actionable
+    copy, falling back to a generic message for anything else.
+    """
+    text = str(exc)
+    if "slug" in text:
+        return "That NFC tag ID is already assigned to another member. Choose a different one."
+    return "Could not save: a value conflicts with an existing record."
+
+
 def system_health():
     result = {
         "ok": True,
@@ -3042,7 +3057,9 @@ def admin_new():
             conn.commit()
             audit("member_created", f'slug={fv(f, "slug")}')
             return redirect(url_for("admin"))
-        except (sqlite3.IntegrityError, ValueError) as exc:
+        except sqlite3.IntegrityError as exc:
+            flash(friendly_integrity_error(exc), "error")
+        except ValueError as exc:
             flash(str(exc), "error")
         finally:
             conn.close()
@@ -3138,7 +3155,9 @@ def admin_edit(profile_id):
             audit("member_updated", f'profile_id={profile_id}')
             conn.close()
             return redirect(url_for("admin"))
-        except (sqlite3.IntegrityError, ValueError) as exc:
+        except sqlite3.IntegrityError as exc:
+            flash(friendly_integrity_error(exc), "error")
+        except ValueError as exc:
             flash(str(exc), "error")
 
     conn.close()
@@ -3282,7 +3301,12 @@ def batch_members():
                       fv(request.form, f"birthdate_{i}"), generate_password_hash(pin)))
                 created += 1
             conn.commit()
-        except (sqlite3.IntegrityError, ValueError) as exc:
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            conn.close()
+            flash(f"Batch was not saved: {friendly_integrity_error(exc)}", "error")
+            return redirect(url_for("batch_members"))
+        except ValueError as exc:
             conn.rollback()
             conn.close()
             flash(f"Batch was not saved: {exc}", "error")

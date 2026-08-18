@@ -1,0 +1,14 @@
+{
+  "affected_projects": [],
+  "audit_job_id": null,
+  "category": "maintainability",
+  "created_at": "2026-08-18T15:28:58.592450+00:00",
+  "file": "app.py",
+  "line": 262,
+  "mode": "finding",
+  "project_path": null,
+  "ref": "HYRAX-112",
+  "severity": "medium",
+  "title": "init_db() is a 280-line function mixing schema creation, migration, and admin bootstrap",
+  "tool": "code-quality"
+}

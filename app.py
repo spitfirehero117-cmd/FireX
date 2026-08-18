@@ -1,5 +1,7 @@
 
 import os
+import csv
+import io
 import sqlite3
 import time
 import uuid
@@ -1711,22 +1713,55 @@ def feedback_delete(feedback_id):
     return redirect(url_for("feedback_inbox"))
 
 
-@app.post("/admin/audit/clear")
+@app.route("/admin/audit/export")
 @tier1_required
-def clear_audit_log():
+def export_audit_log():
+    """Read-only export of the full audit trail for offline archival.
+
+    Full deletion of audit_log via the app is intentionally not
+    supported (see HYRAX-116): the audit trail is the compliance
+    record for device enrollment, login attempts, medical PIN
+    access, and account changes, and a single admin-role click
+    should never be able to erase all of it with no independent
+    copy. Retention-based pruning is handled unattended by
+    cleanup_audit_log() (see server.py's maintenance_loop), which
+    itself writes an audit_log_cleanup event recording how many
+    rows were removed and under what retention policy. Any
+    equivalent of a full wipe requires a direct, out-of-band
+    database operation outside the application, not an HTTP route.
+
+    This endpoint lets a Tier 1 admin pull a timestamped copy of the
+    current audit_log for external/offline archival without
+    mutating the live table.
+    """
     username = session.get("admin_username", "unknown")
     conn = db()
-    conn.execute("DELETE FROM audit_log")
-    conn.commit()
+    rows = conn.execute(
+        "SELECT id, event_type, detail, ip, created_at FROM audit_log ORDER BY id ASC"
+    ).fetchall()
     conn.close()
 
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["id", "event_type", "detail", "ip", "created_at"])
+    for row in rows:
+        writer.writerow(
+            [row["id"], row["event_type"], row["detail"], row["ip"], row["created_at"]]
+        )
+
     audit(
-        "audit_log_cleared",
-        "All previous audit events cleared by Tier 1",
+        "audit_log_exported",
+        f"rows={len(rows)}",
         actor=username
     )
-    flash("Audit Log cleared.", "success")
-    return redirect(url_for("audit_logs"))
+
+    response = make_response(buffer.getvalue())
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    response.headers["Content-Type"] = "text/csv"
+    response.headers["Content-Disposition"] = (
+        f"attachment; filename=audit_log_export_{stamp}.csv"
+    )
+    return response
 
 
 @app.route("/admin/audit")

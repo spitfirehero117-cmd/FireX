@@ -28,6 +28,7 @@ handlers) cannot be driven end-to-end here. Tests therefore favor:
 """
 
 import os
+import secrets
 import sys
 import time
 import uuid
@@ -39,12 +40,23 @@ from werkzeug.security import generate_password_hash
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+# Fixture-only credential material for this test session. These values are
+# never real secrets: they are generated fresh on every test run, only ever
+# written to a throwaway per-test SQLite file under a pytest tmp_path (never
+# a real credential store), and exist solely so fixture-created admin users
+# have *some* password to log in with when a test drives /admin/login over
+# HTTP. Centralizing them here (rather than hand-typing a password string in
+# every test file) means there is exactly one place that defines "what
+# password do fixture users have", instead of the same literal being copied
+# across files.
+TEST_ADMIN_PASSWORD = f"test-fixture-{secrets.token_hex(8)}"
+
 # These must be set before `app` is first imported anywhere in the test
 # session, since app.py reads them at module import time.
 os.environ.setdefault(
     "DB_PATH", str(REPO_ROOT / f".pytest_bootstrap_{uuid.uuid4().hex}.db")
 )
-os.environ.setdefault("ADMIN_PASSWORD", "Bootstrap-Password-123")
+os.environ.setdefault("ADMIN_PASSWORD", f"test-fixture-{secrets.token_hex(8)}")
 os.environ.setdefault("WTF_CSRF_ENABLED", "0")
 
 import app as app_module
@@ -69,10 +81,14 @@ def client(app):
         yield c
 
 
-def make_admin_user(
-    username="admin1", role="admin", password="Password123", **overrides
-):
-    """Insert an admin_users row directly and return its id."""
+def make_admin_user(username="admin1", role="admin", password=None, **overrides):
+    """Insert an admin_users row directly and return its id.
+
+    ``password`` defaults to the shared ``TEST_ADMIN_PASSWORD`` fixture
+    constant so callers don't need to hand-type a password literal; pass an
+    explicit value only when a test specifically needs a distinct password.
+    """
+    password = password if password is not None else TEST_ADMIN_PASSWORD
     conn = app_module.db()
     now = int(time.time())
     fields = {
@@ -191,7 +207,7 @@ def device_cookie(app):
 @pytest.fixture()
 def logged_in_client(app, device_cookie):
     """A test client with an approved device cookie and admin session set."""
-    user_id = make_admin_user(username="admin1", role="admin", password="Password123")
+    user_id = make_admin_user(username="admin1", role="admin")
     with app.test_client() as c:
         c.set_cookie(app_module.DEVICE_COOKIE_NAME, device_cookie)
         with c.session_transaction() as sess:

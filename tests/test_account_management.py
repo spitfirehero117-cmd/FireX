@@ -25,7 +25,7 @@ import app as app_module
 @pytest.fixture()
 def chief_client(app):
     device_token = make_device()
-    chief_id = make_admin_user(username="chief1", role="chief", password="Password123")
+    chief_id = make_admin_user(username="chief1", role="chief")
     with app.test_client() as c:
         c.set_cookie(app_module.DEVICE_COOKIE_NAME, device_token)
         with c.session_transaction() as sess:

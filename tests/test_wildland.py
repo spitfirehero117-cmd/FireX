@@ -16,7 +16,7 @@ import time
 
 import jinja2
 import pytest
-from conftest import make_admin_user, make_device
+from conftest import TEST_ADMIN_PASSWORD, make_admin_user, make_device
 
 import app as app_module
 
@@ -209,12 +209,13 @@ class TestDeviceEnrollment:
 
 class TestAdminLoginLockout:
     def test_login_success_sets_session(self, app, client):
-        make_admin_user(username="loginuser", password="Password123")
+        make_admin_user(username="loginuser")
         device_token = make_device()
         client.set_cookie(app_module.DEVICE_COOKIE_NAME, device_token)
 
         resp = client.post(
-            "/admin/login", data={"username": "loginuser", "password": "Password123"}
+            "/admin/login",
+            data={"username": "loginuser", "password": TEST_ADMIN_PASSWORD},
         )
         assert resp.status_code == 302
         with client.session_transaction() as sess:
@@ -223,7 +224,7 @@ class TestAdminLoginLockout:
     def test_login_wrong_password_increments_failed_logins(self, app, client):
         device_token = make_device()
         client.set_cookie(app_module.DEVICE_COOKIE_NAME, device_token)
-        make_admin_user(username="loginuser2", password="Password123")
+        make_admin_user(username="loginuser2")
 
         with pytest.raises(jinja2.TemplateNotFound):
             client.post(
@@ -240,7 +241,7 @@ class TestAdminLoginLockout:
     def test_login_locks_account_after_five_failures(self, app, client):
         device_token = make_device()
         client.set_cookie(app_module.DEVICE_COOKIE_NAME, device_token)
-        make_admin_user(username="loginuser3", password="Password123")
+        make_admin_user(username="loginuser3")
 
         for _ in range(5):
             with pytest.raises(jinja2.TemplateNotFound):
@@ -261,7 +262,7 @@ class TestAdminLoginLockout:
         with pytest.raises(jinja2.TemplateNotFound):
             client.post(
                 "/admin/login",
-                data={"username": "loginuser3", "password": "Password123"},
+                data={"username": "loginuser3", "password": TEST_ADMIN_PASSWORD},
             )
         with client.session_transaction() as sess:
             assert sess.get("admin_username") is None

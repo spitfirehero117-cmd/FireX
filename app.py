@@ -374,9 +374,12 @@ def ensure_four_role_admin_schema(conn):
     conn.execute("DROP TABLE admin_users_pre_v7")
 
 
-def init_db():
-    conn = db()
-    configure_database(conn)
+def create_schema(conn):
+    """Create every application table if it does not already exist.
+
+    Pure DDL only -- no column migrations, data seeding, or admin bootstrap
+    live here. Safe to call repeatedly (``CREATE TABLE IF NOT EXISTS``).
+    """
     conn.executescript("""
     CREATE TABLE IF NOT EXISTS profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -586,6 +589,16 @@ def init_db():
     );
     """)
 
+
+def run_migrations(conn):
+    """Apply ad-hoc, additive schema migrations on top of ``create_schema``.
+
+    Each step is independently idempotent (``ensure_column`` no-ops if the
+    column already exists; ``ensure_four_role_admin_schema`` no-ops once the
+    ``admin_users`` table already has the four-role CHECK constraint), so
+    this can be re-run on every startup without side effects beyond the
+    first run.
+    """
     for col, definition in [
         ("department_details", "TEXT"),
         ("qualifications", "TEXT"),
@@ -621,13 +634,28 @@ def init_db():
     ensure_column(conn, "timesheets", "correction_reason", "TEXT")
     ensure_column(conn, "timesheets", "corrected_by", "TEXT")
     conn.execute("UPDATE feedback SET priority='Urgent' WHERE priority='High'")
+
+
+def seed_default_options(conn):
+    """Seed the default qualification/certification option rows.
+
+    Uses ``INSERT OR IGNORE`` against a UNIQUE column, so this is safe to
+    re-run every startup -- existing rows (including ones an admin has since
+    disabled) are left untouched.
+    """
     for name in DEFAULT_QUALIFICATION_OPTIONS:
         conn.execute("INSERT OR IGNORE INTO qualification_options(name) VALUES(?)", (name,))
     for name in DEFAULT_CERTIFICATION_OPTIONS:
         conn.execute("INSERT OR IGNORE INTO certification_options(name) VALUES(?)", (name,))
 
-    conn.commit()
 
+def bootstrap_admin_account(conn):
+    """Create the first admin account if no admin users exist yet.
+
+    No-ops once any admin user row exists, so this is safe to call on every
+    startup. Assumes ``run_migrations`` has already run (the ``admin_users``
+    table must have its final column set and four-role schema in place).
+    """
     admin_count = conn.execute("SELECT COUNT(*) AS c FROM admin_users").fetchone()["c"]
     if admin_count == 0:
         bootstrap_username = os.environ.get("ADMIN_USERNAME", "admin").strip() or "admin"
@@ -666,6 +694,23 @@ def init_db():
         print("This password must be changed at first login.")
         print("=" * 64)
         print("")
+
+
+def init_db():
+    """Bring the database up to the current schema/data/bootstrap state.
+
+    Thin orchestrator: each concern lives in its own function so a change to
+    one (e.g. admin bootstrap) doesn't require re-reading unrelated table
+    DDL, and each step can be exercised independently in tests.
+    """
+    conn = db()
+    configure_database(conn)
+    create_schema(conn)
+    run_migrations(conn)
+    seed_default_options(conn)
+    conn.commit()
+
+    bootstrap_admin_account(conn)
 
     conn.close()
     ensure_bootstrap_code()
